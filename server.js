@@ -1,5 +1,5 @@
 /**
- * 飞书AI助手 - Cloudflare Workers版本
+ * 飞书AI助手 - Cloudflare Workers 简化版
  */
 const APP_ID = 'cli_a923fe15f53c9bc7';
 const APP_SECRET = 'h3sepXWkyTYjYZgklxDaVhLo5ezR5YGx';
@@ -48,11 +48,11 @@ async function replyMessage(messageId, content) {
   });
 }
 
-// AI处理函数
+// AI处理
 function processAI(message) {
   const msg = message.toLowerCase().trim();
   
-  if (['你好', 'hello', 'hi', '嗨'].some(g => msg.includes(g))) {
+  if (msg.includes('你好') || msg.includes('hello') || msg.includes('hi')) {
     return '你好！我是飞书AI助手，已成功连接！🎉\n\n告诉我你需要做什么？';
   }
   
@@ -63,50 +63,47 @@ function processAI(message) {
   return `收到任务：「${message}」✅ 任务已记录！\n\n我是飞书AI助手，7×24小时运行中！`;
 }
 
-// 主请求处理
-async function handleRequest(request) {
-  if (request.method === 'POST') {
-    const data = await request.json();
-    
-    // URL验证
-    if (data.type === 'url_verification') {
-      return new Response(JSON.stringify({ challenge: data.challenge }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    // 处理消息
-    const event = data.event || {};
-    if (event.type === 'message') {
-      const message = event.message || {};
-      const messageId = message.message_id;
-      const content = JSON.parse(message.content || '{}');
-      const text = content.text || '';
-      
-      await replyMessage(messageId, '🔄 收到任务，正在处理...');
-      const response = processAI(text);
-      await replyMessage(messageId, response);
-    }
-  }
-  
-  return new Response(JSON.stringify({ code: 0, msg: 'success' }), {
-    headers: { 'Content-Type': 'application/json' }
-  });
-}
-
-// 入口
+// 主入口
 export default {
   async fetch(request) {
     const url = new URL(request.url);
     
-    if (url.pathname === '/' || url.pathname === '') {
+    // 健康检查
+    if (url.pathname === '/') {
       return new Response(JSON.stringify({ status: 'ok', service: '飞书AI助手' }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
     
-    if (url.pathname === '/webhook') {
-      return handleRequest(request);
+    // Webhook
+    if (url.pathname === '/webhook' && request.method === 'POST') {
+      const data = await request.json();
+      
+      // URL验证 - 立即返回
+      if (data.type === 'url_verification') {
+        return new Response(JSON.stringify({ challenge: data.challenge }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // 处理消息
+      const event = data.event || {};
+      if (event.type === 'message') {
+        const message = event.message || {};
+        const messageId = message.message_id;
+        
+        const content = JSON.parse(message.content || '{}');
+        const text = content.text || '';
+        
+        replyMessage(messageId, '🔄 收到任务，正在处理...');
+        
+        const response = processAI(text);
+        replyMessage(messageId, response);
+      }
+      
+      return new Response(JSON.stringify({ code: 0, msg: 'success' }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
     
     return new Response('Not Found', { status: 404 });
